@@ -1,0 +1,24 @@
+# requirements.txt - Python Dependencies
+
+Flask==2.3.3
+Flask-CORS==4.0.0
+supabase==1.0.4
+python-dotenv==1.0.0
+requests==2.31.0
+Werkzeug==2.3.7
+Jinja2==3.1.2
+gunicorn==21.2.0
+
+# Optional for production deployment
+psycopg2-binary==2.9.7
+
+# Optional for email services
+sendgrid==6.10.0
+# OR
+mailgun==0.1.1
+
+# Optional for QR code generation
+qrcode[pil]==7.4.2
+
+# Optional for enhanced logging
+python-json-logger==2.0.7
