@@ -1,0 +1,513 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Dashboard - Coupon Tracker</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Admin Dashboard</h1>
+            <nav>
+                <a href="{{ url_for('index') }}">Home</a>
+                <a href="{{ url_for('admin') }}" class="active">Admin</a>
+                <a href="{{ url_for('claim_page') }}">Claim</a>
+                {% if config.ENABLE_SHOPIFY_INTEGRATION %}
+                <a href="{{ url_for('shopify_integration') }}">Shopify</a>
+                {% endif %}
+            </nav>
+        </header>
+
+        <main>
+            <!-- Analytics Overview -->
+            <section class="analytics-overview">
+                <h2>Analytics Overview</h2>
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <h3>Total Coupons</h3>
+                        <span class="stat-number" id="total-coupons">{{ analytics['total_coupons'] or 0 }}</span>
+                    </div>
+                    <div class="stat-card">
+                        <h3>Active Coupons</h3>
+                        <span class="stat-number" id="active-coupons">{{ analytics['active_coupons'] or 0 }}</span>
+                    </div>
+                    <div class="stat-card">
+                        <h3>Total Claims</h3>
+                        <span class="stat-number" id="total-claims">{{ analytics['total_claims'] or 0 }}</span>
+                    </div>
+                    <div class="stat-card">
+                        <h3>Total Savings</h3>
+                        <span class="stat-number" id="total-savings">${{ analytics['total_savings'] or 0 }}</span>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Quick Actions -->
+            <section class="quick-actions">
+                <h2>Quick Actions</h2>
+                <div class="action-grid">
+                    <button class="action-btn" data-modal="createCouponModal">
+                        <span class="action-icon">➕</span>
+                        <span>Create Coupon</span>
+                    </button>
+                    <button class="action-btn" onclick="exportCoupons('csv')">
+                        <span class="action-icon">📊</span>
+                        <span>Export CSV</span>
+                    </button>
+                    <button class="action-btn" data-modal="bulkImportModal">
+                        <span class="action-icon">📥</span>
+                        <span>Bulk Import</span>
+                    </button>
+                    <button class="action-btn" onclick="generateReport()">
+                        <span class="action-icon">📈</span>
+                        <span>Generate Report</span>
+                    </button>
+                </div>
+            </section>
+
+            <!-- Coupon Management -->
+            <section class="coupon-management">
+                <div class="section-header">
+                    <h2>Coupon Management</h2>
+                    <div class="search-filter">
+                        <input type="text" id="search" placeholder="Search coupons..." class="search-input">
+                        <div class="filter-group">
+                            <button class="filter-btn active" data-filter="status" data-value="all">All</button>
+                            <button class="filter-btn" data-filter="status" data-value="active">Active</button>
+                            <button class="filter-btn" data-filter="status" data-value="inactive">Inactive</button>
+                            <button class="filter-btn" data-filter="status" data-value="expired">Expired</button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="bulk-actions" style="display: none;">
+                    <button class="btn btn-danger" onclick="bulkDeleteCoupons()">Delete Selected</button>
+                    <button class="btn btn-secondary" onclick="bulkUpdateStatus('active')">Activate Selected</button>
+                    <button class="btn btn-secondary" onclick="bulkUpdateStatus('inactive')">Deactivate Selected</button>
+                </div>
+
+                <div class="table-container">
+                    <table class="admin-table">
+                        <thead>
+                            <tr>
+                                <th><input type="checkbox" id="selectAll" onchange="selectAllCoupons()"></th>
+                                <th data-sort="code">Code</th>
+                                <th data-sort="description">Description</th>
+                                <th data-sort="type">Type</th>
+                                <th data-sort="value">Value</th>
+                                <th data-sort="usage">Usage</th>
+                                <th data-sort="expiry">Expiry</th>
+                                <th data-sort="status">Status</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for coupon in coupons %}
+                            <tr data-coupon-id="{{ coupon['id'] }}">
+                                <td><input type="checkbox" class="coupon-checkbox" value="{{ coupon['id'] }}" onchange="updateBulkActions()"></td>
+                                <td class="coupon-code">{{ coupon['code'] }}</td>
+                                <td>{{ coupon['description'] or 'No description' }}</td>
+                                <td class="coupon-type">{{ coupon['discount_type'].title() }}</td>
+                                <td>
+                                    {% if coupon['discount_type'] == 'percentage' %}
+                                        {{ coupon['discount_value'] }}%
+                                    {% else %}
+                                        ${{ coupon['discount_value'] }}
+                                    {% endif %}
+                                </td>
+                                <td class="usage-count">
+                                    {{ coupon['usage_count'] }}
+                                    {% if coupon['usage_limit'] %}
+                                        / {{ coupon['usage_limit'] }}
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if coupon['expiry_date'] %}
+                                        {{ coupon['expiry_date'].strftime('%Y-%m-%d') if coupon['expiry_date'].__class__.__name__ == 'datetime' else coupon['expiry_date'] }}
+                                    {% else %}
+                                        No expiry
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <span class="status-badge {{ coupon['status'] }}">
+                                        {{ coupon['status'].title() }}
+                                    </span>
+                                </td>
+                                <td class="actions">
+                                    <button class="btn btn-sm btn-primary" onclick="editCoupon('{{ coupon['id'] }}')">Edit</button>
+                                    <button class="btn btn-sm btn-secondary" onclick="toggleCouponStatus('{{ coupon['id'] }}', '{{ coupon['status'] }}')">
+                                        {{ 'Deactivate' if coupon['status'] == 'active' else 'Activate' }}
+                                    </button>
+                                    <button class="btn btn-sm btn-danger" onclick="deleteCoupon('{{ coupon['id'] }}')">Delete</button>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+            <!-- Recent Activity -->
+            <section class="recent-activity">
+                <h2>Recent Activity</h2>
+                <div class="activity-list">
+                    {% for activity in recent_activity %}
+                    <div class="activity-item">
+                        <div class="activity-icon {{ activity['type'] }}">
+                            {{ activity['icon'] or '📋' }}
+                        </div>
+                        <div class="activity-content">
+                            <p class="activity-message">{{ activity['message'] }}</p>
+                            <span class="activity-time">{{ activity['timestamp'].strftime('%Y-%m-%d %H:%M') if activity['timestamp'].__class__.__name__ == 'datetime' else activity['timestamp'] }}</span>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <!-- Create Coupon Modal -->
+    <div id="createCouponModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Create New Coupon</h3>
+                <span class="modal-close">&times;</span>
+            </div>
+            <form id="createCouponForm" action="/admin/create-coupon" method="POST">
+                <div class="form-group">
+                    <label for="coupon_code">Coupon Code:</label>
+                    <input type="text" id="coupon_code" name="code" required>
+                </div>
+                <div class="form-group">
+                    <label for="description">Description:</label>
+                    <textarea id="description" name="description" rows="3"></textarea>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="discount_type">Discount Type:</label>
+                        <select id="discount_type" name="discount_type" required>
+                            <option value="percentage">Percentage</option>
+                            <option value="fixed">Fixed Amount</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="discount_value">Discount Value:</label>
+                        <input type="number" id="discount_value" name="discount_value" step="0.01" required>
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="usage_limit">Usage Limit:</label>
+                        <input type="number" id="usage_limit" name="usage_limit" placeholder="Leave empty for unlimited">
+                    </div>
+                    <div class="form-group">
+                        <label for="expiry_date">Expiry Date:</label>
+                        <input type="date" id="expiry_date" name="expiry_date">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label for="minimum_order">Minimum Order Value:</label>
+                    <input type="number" id="minimum_order" name="minimum_order_value" step="0.01" placeholder="0.00">
+                </div>
+                <div class="modal-actions">
+                    <button type="button" class="btn btn-secondary modal-close">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Create Coupon</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Bulk Import Modal -->
+    <div id="bulkImportModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Bulk Import Coupons</h3>
+                <span class="modal-close">&times;</span>
+            </div>
+            <form id="bulkImportForm" action="/admin/bulk-import" method="POST" enctype="multipart/form-data">
+                <div class="form-group">
+                    <label for="import_file">CSV File:</label>
+                    <input type="file" id="import_file" name="file" accept=".csv" required>
+                    <small class="form-text">CSV should have columns: code, description, discount_type, discount_value, usage_limit, expiry_date</small>
+                </div>
+                <div class="modal-actions">
+                    <button type="button" class="btn btn-secondary modal-close">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Import Coupons</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script src="{{ url_for('static', filename='app.js') }}"></script>
+    <script>
+        // Admin-specific JavaScript functions
+        function editCoupon(couponId) {
+            // Fetch coupon data and populate edit form
+            fetch(`/api/coupons/${couponId}`)
+                .then(response => response.json())
+                .then(coupon => {
+                    // You can implement an edit modal here
+                    console.log('Edit coupon:', coupon);
+                })
+                .catch(error => {
+                    showNotification('Failed to load coupon data', 'error');
+                });
+        }
+
+        // Add these JavaScript functions to your admin.html or app.js
+
+        function toggleCouponStatus(couponId, currentStatus) {
+            const newStatus = currentStatus === 'active' ? 'inactive' : 'active';
+    
+            fetch('/admin/toggle-coupon-status', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    coupon_id: couponId,
+                    status: newStatus
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    showNotification(`Coupon ${newStatus === 'active' ? 'activated' : 'deactivated'} successfully`, 'success');
+                    // Refresh the page or update the UI
+                    setTimeout(() => location.reload(), 1000);
+                } else {
+                    showNotification('Failed to update coupon status', 'error');
+                }
+            })
+            .catch(error => {
+                showNotification('Error updating coupon status', 'error');
+            });
+        }
+
+        function deleteCoupon(couponId) {
+            if (!confirm('Are you sure you want to delete this coupon? This action cannot be undone.')) {
+                return;
+            }
+    
+            fetch('/admin/delete-coupon', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    coupon_id: couponId
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    showNotification('Coupon deleted successfully', 'success');
+                    // Remove the row from the table
+                    document.querySelector(`tr[data-coupon-id="${couponId}"]`).remove();
+                } else {
+                    showNotification('Failed to delete coupon', 'error');
+                }
+            })
+            .catch(error => {
+                showNotification('Error deleting coupon', 'error');
+            });
+        }
+
+        function selectAllCoupons() {
+            const selectAll = document.getElementById('selectAll');
+            const checkboxes = document.querySelectorAll('.coupon-checkbox');
+    
+            checkboxes.forEach(checkbox => {
+                checkbox.checked = selectAll.checked;
+            });
+    
+            updateBulkActions();
+        }
+
+        function updateBulkActions() {
+            const checkedBoxes = document.querySelectorAll('.coupon-checkbox:checked');
+            const bulkActions = document.querySelector('.bulk-actions');
+    
+            if (checkedBoxes.length > 0) {
+                bulkActions.style.display = 'block';
+            } else {
+                bulkActions.style.display = 'none';
+            }
+        }
+
+        function bulkDeleteCoupons() {
+            const checkedBoxes = document.querySelectorAll('.coupon-checkbox:checked');
+            if (checkedBoxes.length === 0) {
+                showNotification('No coupons selected', 'warning');
+                return;
+            }
+    
+            if (!confirm(`Are you sure you want to delete ${checkedBoxes.length} selected coupons? This action cannot be undone.`)) {
+                return;
+            }
+    
+            const couponIds = Array.from(checkedBoxes).map(cb => cb.value);
+    
+            fetch('/admin/bulk-delete', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    coupon_ids: couponIds
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    showNotification(`${data.deleted_count} coupons deleted successfully`, 'success');
+                    setTimeout(() => location.reload(), 1000);
+                } else {
+                    showNotification('Failed to delete coupons', 'error');
+                }
+            })
+            .catch(error => {
+                showNotification('Error deleting coupons', 'error');
+            });
+        }
+
+        function bulkUpdateStatus(status) {
+            const checkedBoxes = document.querySelectorAll('.coupon-checkbox:checked');
+            if (checkedBoxes.length === 0) {
+                showNotification('No coupons selected', 'warning');
+                return;
+            }
+    
+            const couponIds = Array.from(checkedBoxes).map(cb => cb.value);
+    
+            fetch('/admin/bulk-update-status', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    coupon_ids: couponIds,
+                    status: status
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    showNotification(`${data.updated_count} coupons updated successfully`, 'success');
+                    setTimeout(() => location.reload(), 1000);
+                } else {
+                    showNotification('Failed to update coupons', 'error');
+                }
+            })
+            .catch(error => {
+                showNotification('Error updating coupons', 'error');
+            });
+        }
+
+        function exportCoupons(format) {
+            if (format === 'csv') {
+                window.location.href = '/admin/generate-report';
+            }
+        }
+
+        function loadCouponStats() {
+            // Function to refresh stats - you can implement this to fetch updated analytics
+            fetch('/api/stats')
+                .then(response => response.json())
+                .then(data => {
+                    document.getElementById('total-coupons').textContent = data.total_coupons || 0;
+                    document.getElementById('active-coupons').textContent = data.active_coupons || 0;
+                    document.getElementById('total-claims').textContent = data.total_claims || 0;
+                    document.getElementById('total-savings').textContent = '$' + (data.total_savings || 0);
+                })
+                .catch(error => {
+                    console.log('Error loading stats:', error);
+                });
+        }
+
+        function showNotification(message, type) {
+            const notification = document.createElement('div');
+            notification.className = `notification ${type}`;
+            notification.textContent = message;
+            notification.style.cssText = `
+                position: fixed;
+                top: 20px;
+                right: 20px;
+                padding: 15px 20px;
+                background: ${type === 'success' ? '#4CAF50' : type === 'error' ? '#f44336' : '#ff9800'};
+                color: white;
+                border-radius: 5px;
+                z-index: 1000;
+                animation: slideIn 0.3s ease;
+    `       ;
+    
+            document.body.appendChild(notification);
+    
+            setTimeout(() => {
+                notification.style.animation = 'slideOut 0.3s ease';
+                setTimeout(() => notification.remove(), 300);
+            }, 3000);
+        }
+
+        // Modal functionality
+        document.addEventListener('DOMContentLoaded', function() {
+            // Modal handling
+            const modals = document.querySelectorAll('.modal');
+            const modalTriggers = document.querySelectorAll('[data-modal]');
+            const modalCloses = document.querySelectorAll('.modal-close');
+    
+            modalTriggers.forEach(trigger => {
+                trigger.addEventListener('click', function() {
+                    const modalId = this.getAttribute('data-modal');
+                    const modal = document.getElementById(modalId);
+                    if (modal) {
+                        modal.style.display = 'flex';
+                    }
+                });
+            });
+    
+            modalCloses.forEach(close => {
+                close.addEventListener('click', function() {
+                    this.closest('.modal').style.display = 'none';
+                });
+            });
+    
+            // Close modal when clicking outside
+            modals.forEach(modal => {
+                modal.addEventListener('click', function(e) {
+                    if (e.target === this) {
+                        this.style.display = 'none';
+                    }
+                });
+            });
+        });
+
+        function generateReport() {
+            const reportUrl = '/admin/generate-report';
+            const link = document.createElement('a');
+            link.href = reportUrl;
+            link.download = `coupon_report_${new Date().toISOString().split('T')[0]}.pdf`;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            
+            showNotification('Report generation started', 'success');
+        }
+
+        // Initialize admin dashboard
+        document.addEventListener('DOMContentLoaded', function() {
+            // Load real-time stats every 30 seconds
+            setInterval(loadCouponStats, 30000);
+            
+            // Initialize bulk action checkboxes
+            const couponCheckboxes = document.querySelectorAll('.coupon-checkbox');
+            couponCheckboxes.forEach(checkbox => {
+                checkbox.addEventListener('change', updateBulkActions);
+            });
+        });
+    </script>
+</body>
+</html>

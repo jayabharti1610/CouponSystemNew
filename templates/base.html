@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Skin & Wicks - Coupon Tracking{% endblock %}</title>
+    <meta name="description" content="Skin & Wicks Coupon Management and Tracking System">
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    {% block extra_head %}{% endblock %}
+</head>
+<body>
+    <div class="app-container">
+        <!-- Header -->
+        <header class="header">
+            <div class="header-content">
+                <div class="brand">
+                    <h1 class="app-title">
+                        <i class="fas fa-spa"></i>
+                        Skin & Wicks
+                    </h1>
+                    <p class="app-subtitle">Coupon Management System</p>
+                </div>
+                <nav class="nav-links">
+                    <a href="/" class="nav-link {% if request.endpoint == 'index' %}active{% endif %}">
+                        <i class="fas fa-chart-line"></i>
+                        Dashboard
+                    </a>
+                    <a href="/admin" class="nav-link {% if request.endpoint == 'admin' %}active{% endif %}">
+                        <i class="fas fa-cog"></i>
+                        Admin
+                    </a>
+                    <a href="/shopify" class="nav-link {% if request.endpoint == 'shopify_integration' %}active{% endif %}">
+                        <i class="fas fa-shopping-cart"></i>
+                        Shopify
+                    </a>
+                    <a href="/claim" class="nav-link {% if request.endpoint == 'claim_page' %}active{% endif %}">
+                        <i class="fas fa-gift"></i>
+                        Claim Coupon
+                    </a>
+                </nav>
+            </div>
+        </header>
+
+        <!-- Flash Messages -->
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                <div class="flash-messages">
+                    {% for category, message in messages %}
+                        <div class="flash-message flash-{{ category }}">
+                            <i class="fas fa-info-circle"></i>
+                            <span>{{ message }}</span>
+                            <button class="flash-close">&times;</button>
+                        </div>
+                    {% endfor %}
+                </div>
+            {% endif %}
+        {% endwith %}
+
+        <!-- Main Content -->
+        <main class="main-content">
+            {% block content %}{% endblock %}
+        </main>
+
+        <!-- Footer -->
+        <footer class="footer">
+            <div class="footer-content">
+                <p>&copy; 2025 Skin & Wicks. All rights reserved.</p>
+                <p>Coupon Tracking System v2.0 | Powered by Flask & Supabase</p>
+            </div>
+        </footer>
+    </div>
+
+    <!-- Toast Container -->
+    <div id="toast-container" class="toast-container"></div>
+
+    <!-- Global JavaScript -->
+    <script src="{{ url_for('static', filename='app.js') }}"></script>
+    {% block extra_scripts %}{% endblock %}
+</body>
+</html>

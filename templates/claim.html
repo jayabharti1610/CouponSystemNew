@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Claim Coupon - Coupon Tracker</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Claim Your Coupon</h1>
+            <nav>
+                <a href="{{ url_for('index') }}">Home</a>
+                <a href="{{ url_for('admin') }}">Admin</a>
+                <a href="{{ url_for('claim_page') }}" class="active">Claim</a>
+            </nav>
+        </header>
+
+        <main>
+            <section class="claim-section">
+                {% if not coupon %}
+                <div class="claim-form">
+                    <h2>Enter Coupon Code</h2>
+                    <form id="claimForm" action="/claim" method="POST">
+                        <div class="form-group">
+                            <label for="coupon_code">Coupon Code:</label>
+                            <input type="text" id="coupon_code" name="coupon_code" placeholder="Enter your coupon code" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="user_email">Email (optional):</label>
+                            <input type="email" id="user_email" name="user_email" placeholder="your@email.com">
+                        </div>
+                        <button type="submit" class="btn btn-primary">Claim Coupon</button>
+                    </form>
+                </div>
+                {% endif %}
+
+                {% if coupon %}
+                    {% if coupon['status'] == 'active' and coupon['remaining_uses'] > 0 %}
+                    <div class="coupon-valid">
+                        <div class="coupon-card">
+                            <h2>🎉 Valid Coupon!</h2>
+                            <div class="coupon-details">
+                                <h3>{{ coupon['code'] }}</h3>
+                                <p class="coupon-description">{{ coupon['description'] }}</p>
+                                
+                                <div class="coupon-value">
+                                    {% if coupon['discount_type'] == 'percentage' %}
+                                        <span class="discount-amount">{{ coupon['discount_value'] }}% OFF</span>
+                                    {% else %}
+                                        <span class="discount-amount">${{ coupon['discount_value'] }} OFF</span>
+                                    {% endif %}
+                                </div>
+
+                                <div class="coupon-info">
+                                    <div class="info-item">
+                                        <span class="label">Expires:</span>
+                                        <span class="value">
+                                            {% if coupon['expiry_date'] %}
+                                                {{ coupon['expiry_date'].strftime('%B %d, %Y') if coupon['expiry_date'].__class__.__name__ == 'datetime' else coupon['expiry_date'] }}
+                                            {% else %}
+                                                No expiry
+                                            {% endif %}
+                                        </span>
+                                    </div>
+                                    <div class="info-item">
+                                        <span class="label">Remaining Uses:</span>
+                                        <span class="value">{{ coupon['remaining_uses'] if coupon['usage_limit'] else 'Unlimited' }}</span>
+                                    </div>
+                                    <div class="info-item">
+                                        <span class="label">Minimum Order:</span>
+                                        <span class="value">${{ coupon['minimum_order_value'] if coupon['minimum_order_value'] else '0' }}</span>
+                                    </div>
+                                </div>
+
+                                <div class="claim-actions">
+                                    <form action="/claim/{{ coupon['id'] }}" method="POST">
+                                        <input type="hidden" name="user_email" value="{{ user_email }}">
+                                        <button type="submit" class="btn btn-success">Use This Coupon</button>
+                                    </form>
+                                    <button class="btn btn-outline" onclick="copyCouponCode('{{ coupon['code'] }}')">Copy Code</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    {% else %}
+                    <div class="coupon-invalid">
+                        <div class="error-card">
+                            <h2>❌ Invalid Coupon</h2>
+                            <p>
+                                {% if coupon['status'] != 'active' %}
+                                    This coupon is no longer active.
+                                {% elif coupon['remaining_uses'] <= 0 %}
+                                    This coupon has reached its usage limit.
+                                {% endif %}
+                            </p>
+                            <a href="/claim" class="btn btn-primary">Try Another Code</a>
+                        </div>
+                    </div>
+                    {% endif %}
+                {% endif %}
+
+                {% if error %}
+                <div class="coupon-invalid">
+                    <div class="error-card">
+                        <h2>❌ Coupon Not Found</h2>
+                        <p>{{ error }}</p>
+                        <a href="/claim" class="btn btn-primary">Try Another Code</a>
+                    </div>
+                </div>
+                {% endif %}
+
+                {% if success %}
+                <div class="coupon-claimed">
+                    <div class="success-card">
+                        <h2>🎊 Coupon Claimed Successfully!</h2>
+                        <p>{{ success }}</p>
+                        <div class="next-steps">
+                            <h3>Next Steps:</h3>
+                            <ol>
+                                <li>Save your coupon code: <strong>{{ claimed_code }}</strong></li>
+                                <li>Apply it at checkout</li>
+                                <li>Enjoy your discount!</li>
+                            </ol>
+                        </div>
+                        <div class="claim-actions">
+                            <button class="btn btn-outline" onclick="copyCouponCode('{{ claimed_code }}')">Copy Code</button>
+                            <a href="/" class="btn btn-primary">Browse More Coupons</a>
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
+            </section>
+
+            <section class="help-section">
+                <h3>Need Help?</h3>
+                <div class="help-cards">
+                    <div class="help-card">
+                        <h4>🔍 Can't find your coupon?</h4>
+                        <p>Make sure you've entered the code exactly as provided, including any capital letters or special characters.</p>
+                    </div>
+                    <div class="help-card">
+                        <h4>⏰ Expired coupon?</h4>
+                        <p>Check our homepage for the latest active coupons and promotions.</p>
+                    </div>
+                    <div class="help-card">
+                        <h4>🛒 How to use?</h4>
+                        <p>Copy the coupon code and paste it in the discount field during checkout.</p>
+                    </div>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <script src="{{ url_for('static', filename='app.js') }}"></script>
+    <script>
+        function copyCouponCode(code) {
+            navigator.clipboard.writeText(code).then(function() {
+                showNotification('Coupon code copied to clipboard!', 'success');
+            }).catch(function() {
+                // Fallback for older browsers
+                const textArea = document.createElement('textarea');
+                textArea.value = code;
+                document.body.appendChild(textArea);
+                textArea.select();
+                document.execCommand('copy');
+                document.body.removeChild(textArea);
+                showNotification('Coupon code copied to clipboard!', 'success');
+            });
+        }
+
+        function showNotification(message, type) {
+            const notification = document.createElement('div');
+            notification.className = `notification ${type}`;
+            notification.textContent = message;
+            notification.style.cssText = `
+                position: fixed;
+                top: 20px;
+                right: 20px;
+                padding: 15px 20px;
+                background: ${type === 'success' ? '#4CAF50' : '#f44336'};
+                color: white;
+                border-radius: 5px;
+                z-index: 1000;
+                animation: slideIn 0.3s ease;
+            `;
+            
+            document.body.appendChild(notification);
+            
+            setTimeout(() => {
+                notification.style.animation = 'slideOut 0.3s ease';
+                setTimeout(() => notification.remove(), 300);
+            }, 3000);
+        }
+
+        // Add CSS animations
+        const style = document.createElement('style');
+        style.textContent = `
+            @keyframes slideIn {
+                from { transform: translateX(100%); }
+                to { transform: translateX(0); }
+            }
+            @keyframes slideOut {
+                from { transform: translateX(0); }
+                to { transform: translateX(100%); }
+            }
+        `;
+        document.head.appendChild(style);
+    </script>
+</body>
+</html>

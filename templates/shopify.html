@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Shopify Integration - Coupon Tracker</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Shopify Integration</h1>
+            <nav>
+                <a href="{{ url_for('index') }}">Home</a>
+                <a href="{{ url_for('admin') }}">Admin</a>
+                <a href="{{ url_for('shopify_integration') }}" class="active">Shopify</a>
+            </nav>
+        </header>
+
+        <main>
+            <section class="integration-section">
+                <h2>Connect Your Shopify Store</h2>
+                <div class="connection-status">
+                    {% if shopify_connected %}
+                        <div class="status connected">
+                            <span class="status-icon">✓</span>
+                            <span>Connected to: {{ store_name }}</span>
+                        </div>
+                    {% else %}
+                        <div class="status disconnected">
+                            <span class="status-icon">×</span>
+                            <span>Not Connected</span>
+                        </div>
+                    {% endif %}
+                </div>
+
+                {% if not shopify_connected %}
+                <div class="setup-form">
+                    <h3>Setup Shopify Integration</h3>
+                    <form id="shopifySetup" action="/shopify/connect" method="POST">
+                        <div class="form-group">
+                            <label for="shop_url">Shop URL:</label>
+                            <input type="text" id="shop_url" name="shop_url" placeholder="your-shop.myshopify.com" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="api_key">API Key:</label>
+                            <input type="text" id="api_key" name="api_key" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="api_secret">API Secret:</label>
+                            <input type="password" id="api_secret" name="api_secret" required>
+                        </div>
+                        <button type="submit" class="btn btn-primary">Connect Store</button>
+                    </form>
+                </div>
+                {% endif %}
+            </section>
+
+            {% if shopify_connected %}
+            <section class="coupon-sync">
+                <h3>Coupon Synchronization</h3>
+                <div class="sync-controls">
+                    <button id="syncCoupons" class="btn btn-secondary">Sync Coupons</button>
+                    <button id="exportCoupons" class="btn btn-outline">Export to Shopify</button>
+                </div>
+                
+                <div class="sync-status" id="syncStatus" style="display: none;">
+                    <div class="loading">Syncing...</div>
+                </div>
+
+                <div class="coupon-list">
+                    <h4>Shopify Discount Codes</h4>
+                    <div class="table-container">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Code</th>
+                                    <th>Type</th>
+                                    <th>Value</th>
+                                    <th>Usage Count</th>
+                                    <th>Status</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="shopifyCoupons">
+                                {% for coupon in shopify_coupons %}
+                                <tr>
+                                    <td>{{ coupon['code'] }}</td>
+                                    <td>{{ coupon['type'] }}</td>
+                                    <td>{{ coupon['value'] }}</td>
+                                    <td>{{ coupon['usage_count'] }}</td>
+                                    <td>
+                                        <span class="status-badge {{ 'active' if coupon['active'] else 'inactive' }}">
+                                            {{ 'Active' if coupon['active'] else 'Inactive' }}
+                                        </span>
+                                    </td>
+                                    <td>
+                                        <button class="btn btn-sm" onclick="importCoupon('{{ coupon['id'] }}')">Import</button>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+            {% endif %}
+        </main>
+    </div>
+
+    <script src="{{ url_for('static', filename='app.js') }}"></script>
+    <script>
+        // Shopify-specific JavaScript
+        document.addEventListener('DOMContentLoaded', function() {
+            const syncButton = document.getElementById('syncCoupons');
+            const exportButton = document.getElementById('exportCoupons');
+            const syncStatus = document.getElementById('syncStatus');
+
+            if (syncButton) {
+                syncButton.addEventListener('click', function() {
+                    syncStatus.style.display = 'block';
+                    fetch('/shopify/sync', { method: 'POST' })
+                        .then(response => response.json())
+                        .then(data => {
+                            syncStatus.innerHTML = data.message;
+                            if (data.success) {
+                                setTimeout(() => location.reload(), 2000);
+                            }
+                        })
+                        .catch(error => {
+                            syncStatus.innerHTML = 'Error syncing coupons';
+                        });
+                });
+            }
+
+            if (exportButton) {
+                exportButton.addEventListener('click', function() {
+                    if (confirm('Export local coupons to Shopify?')) {
+                        fetch('/shopify/export', { method: 'POST' })
+                            .then(response => response.json())
+                            .then(data => alert(data.message));
+                    }
+                });
+            }
+        });
+
+        function importCoupon(couponId) {
+            if (confirm('Import this coupon to local database?')) {
+                fetch(`/shopify/import/${couponId}`, { method: 'POST' })
+                    .then(response => response.json())
+                    .then(data => alert(data.message));
+            }
+        }
+    </script>
+</body>
+</html>
